@@ -16,10 +16,13 @@
       data() {
         return {
           name: 'Lebron',
-          age: 38
+          age: 38,
+          hobby: ['eat', 'drink', { a: 123 }]
         }
       }
     })
+    console.log(vm.age);
+    vm.hobby.push('1212')
   </script>
 </body>
 </html>
