@@ -21,13 +21,16 @@
           age: 38,
           hobby: ['eat', 'drink', { a: 123 }]
         }
-      }
+      },
+      // template: '<div>hello</div>'
     })
 
     // 1。模板引擎 性能差 需要正则匹配替换 1。0 的时候 没有引入虚拟DOM的概念
     // 2采用虚拟DOM  数据变化后比较虚拟DOM的差异 最后更新需要更新的地方
     // 3 核心就是我们需要将模板编程我们的 js语法， 通过js语法生成虚拟DOM
     
+    // 目标：将模板变成js语法
+    // 将template 语法转换成render函数
   </script>
 </body>
 </html>
