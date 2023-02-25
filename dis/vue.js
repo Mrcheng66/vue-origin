@@ -42,7 +42,7 @@
       }
       console.log(inserted);
       // 对新增的内容再次进行观测 inserted 是个数组哦
-      // 是不是想调用observeArray(data) 就可以了， 但是访问不到🐶。。。
+      // 是不是想调用observeArray(data) 就可以了， 但是访问不到🐶。。。, 只能通过额外挂载参数的方法
       if (inserted) {
         // 这里的this 不就是外部的data吗，因为外部是data调用的啊，
         // 所以只能在外部的class Observer 中给data加上一个属性这里就能访问到observeArray(）了
