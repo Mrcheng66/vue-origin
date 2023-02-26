@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <div id="app">
+    <div style="color:red">{{ name }} hello</div>
+    <div>{{ age }}</div>
+  </div>
+  <script src="./vue.js"></script>
+  <script>
+    const vm = new Vue({
+      el: '#app', // 我们将数据解析到el上
+      data() {
+        return {
+          name: 'Lebron',
+          age: 38,
+          hobby: ['eat', 'drink', { a: 123 }]
+        }
+      },
+      // template: '<div>hello</div>'
+    })
+
+    // 1。模板引擎 性能差 需要正则匹配替换 1。0 的时候 没有引入虚拟DOM的概念
+    // 2采用虚拟DOM  数据变化后比较虚拟DOM的差异 最后更新需要更新的地方
+    // 3 核心就是我们需要将模板编程我们的 js语法， 通过js语法生成虚拟DOM
+    
+    // 目标：将模板变成js语法
+    // 将template 语法转换成render函数
+  </script>
+</body>
+</html>
