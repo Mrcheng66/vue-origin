@@ -75,7 +75,7 @@ function genChild(node) {
         lastIndex = index + match[0].length
       }
       if (lastIndex < text.length) {
-        tokens.push(text.slice(lastIndex))
+        tokens.push(JSON.stringify(text.slice(lastIndex)))
       }
       return `_v(${tokens.join('+')})`
     }
