@@ -8,18 +8,26 @@ export function compileToFunction(template) {
 
   // 1 将template 转换成ast 语法树
   let ast = parseHTML(template)
-  console.log(ast);
+  // console.log(ast);
   // console.log(ast);
   // 2 生成render 方法（render 方法执行后的返回的结果就是虚拟dom）
   /* 
+    _c: creatElement()
+    _v: 创建vnode
+    _s: 字符串
     render() {
       return _c('div', {id: 'app'}, _c('div', {style: {color: 'red'}}, _v(_s(name) + 'hello'),
       _c('span', undefind, _v(_s(age)))))
     }
   */
-  const res = codegen(ast)
 
-  console.log(res);
+  // 模板引擎的实现原理就是 with + new Function()
+  let code = codegen(ast)
+  console.log(code)
+  code = `with(this){return ${code}}` // with 语句改变作用域范围(改变取值)
+  let render = new Function(code) // 根据代码生成函数
+  // console.log(render.toString());
+  return render
 }
 
 function genProps(attrs) {

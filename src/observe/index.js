@@ -2,7 +2,7 @@ import { newArrayProto } from "./array";
 
 export function observe(data) {
   // 劫持数据
-  console.log(data);
+  // console.log(data);
 
   // 只对对象进行劫持
   if (typeof data !== 'object' || data === null) return

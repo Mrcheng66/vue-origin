@@ -4,6 +4,45 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
+  function initLifeCycle(Vue) {
+    Vue.prototype._update = function (node) {
+      console.log('update', node);
+    };
+
+    Vue.prototype._render = function () {
+      const vm = this;
+      // console.log(vm.name)
+      return vm.$options.render.call(vm)
+    };
+
+    Vue.prototype._c = function () {
+    };
+
+    Vue.prototype._v = function () {
+    };
+
+    Vue.prototype._s = function (value) {
+      return JSON.stringify(value)
+    };
+  }
+
+
+  // Vue的核心流程 1) 创造了响应式数据 2) 模板转换成ast语法树 3) 将ast语法树转换成render函数 
+  // 4) 后续每次数据更新可以只执行render 函数(无需再次执行ast转换的过程)
+
+  // render 函数会产生虚拟节点(使用响应式数据)
+  // 根据生成的虚拟节点生成真实DOM
+  function mountComponent(vm, el) {
+    // console.log(vm)
+
+    // 1、调用render方法产生虚拟节点, 虚拟DOM
+    vm._update(vm._render()); // vm._render()其实就是执行的 vm.render()
+    // 2、根据虚拟DOM产生真实DOM
+
+    // 3、插入到el元素中
+    
+  }
+
   // Regular Expressions for parsing tags and attributes
   const ncname = `[a-zA-Z_][\\-\\.0-9_a-zA-Z]*`;
   const qnameCapture = `((?:${ncname}\\:)?${ncname})`;
@@ -52,9 +91,9 @@
 
     function charts(text) {
       // console.log(text); // 文本直接放在当前指向的节点中
-      // text = text.replace(/\s/g, '')
-      // text && currentParent.children.push({
-      currentParent.children.push({
+      text = text.replace(/\s/g, '');
+      text && currentParent.children.push({
+      // currentParent.children.push({
         type: TEXT_TYPE,
         text,
         parent: currentParent
@@ -135,18 +174,26 @@
 
     // 1 将template 转换成ast 语法树
     let ast = parseHTML(template);
-    console.log(ast);
+    // console.log(ast);
     // console.log(ast);
     // 2 生成render 方法（render 方法执行后的返回的结果就是虚拟dom）
     /* 
+      _c: creatElement()
+      _v: 创建vnode
+      _s: 字符串
       render() {
         return _c('div', {id: 'app'}, _c('div', {style: {color: 'red'}}, _v(_s(name) + 'hello'),
         _c('span', undefind, _v(_s(age)))))
       }
     */
-    const res = codegen(ast);
 
-    console.log(res);
+    // 模板引擎的实现原理就是 with + new Function()
+    let code = codegen(ast);
+    console.log(code);
+    code = `with(this){return ${code}}`; // with 语句改变作用域范围(改变取值)
+    let render = new Function(code); // 根据代码生成函数
+    // console.log(render.toString());
+    return render
   }
 
   function genProps(attrs) {
@@ -273,7 +320,7 @@
 
   function observe(data) {
     // 劫持数据
-    console.log(data);
+    // console.log(data);
 
     // 只对对象进行劫持
     if (typeof data !== 'object' || data === null) return
@@ -409,7 +456,9 @@
         }
       }
 
-      ops.render; // 最终可以获取render 方法
+      mountComponent(vm); // 组件的挂载
+
+      // ops.render // 最终可以获取render 方法
 
       // script 标签引用的vue.global.js 这个编译过程是在浏览器进行的
       // runtime 是不包含编译的， 整个编译是打包的时候通过loader来转义.vue 文件的
@@ -422,6 +471,7 @@
   }
 
   initMixin(Vue);
+  initLifeCycle(Vue);
 
   return Vue;
 

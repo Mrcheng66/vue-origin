@@ -1,3 +1,4 @@
+import { initLifeCycle } from "./lifecycle"
 import { initMixin } from "./init"
 
 function Vue(option) {
@@ -5,5 +6,6 @@ function Vue(option) {
 }
 
 initMixin(Vue)
+initLifeCycle(Vue)
 
 export default Vue

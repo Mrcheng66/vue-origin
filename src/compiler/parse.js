@@ -53,9 +53,9 @@ export function parseHTML(html) { // html 最开始肯定是一个<
 
   function charts(text) {
     // console.log(text); // 文本直接放在当前指向的节点中
-    // text = text.replace(/\s/g, '')
-    // text && currentParent.children.push({
-    currentParent.children.push({
+    text = text.replace(/\s/g, '')
+    text && currentParent.children.push({
+    // currentParent.children.push({
       type: TEXT_TYPE,
       text,
       parent: currentParent
