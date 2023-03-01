@@ -4,29 +4,63 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
-  function initLifeCycle(Vue) {
-    Vue.prototype._update = function (node) {
-      console.log('update', node);
-    };
+  // h() _c
+  function createElementVNode(vm, tag, data, ...children) {
+    if (data == null) {
+      data = {};
+    }
+    // console.log(vm, arg, '----');
+    let key = data.key;
+    if (key) {
+      delete data.key;
+    }
+    return vnode(vm, tag, key, data, children)
+  }
 
-    Vue.prototype._render = function () {
+  // _v()
+  function createTextVNode(vm, text) {
+    return vnode(vm, undefined, undefined, undefined, undefined, text)
+  }
+
+  // 和ast一样？ ast做的是语法层面的转化， 他描述的是语法本身（可以描述js， css， html）
+  // 我们的虚拟dom 是描述dom元素的， 可以增加一些自定义属性（描述dom的）
+  function vnode(vm, tag, key, data, children, text) {
+    return {
+      vm, tag, key, data, children, text
+    }
+  }
+
+  function initLifeCycle(Vue) {
+    Vue.prototype._update = function (vnode) {
+      // 将虚拟dom转化为真实dom
+
+      // patch 既有初始化的功能  又有更新的功能
       const vm = this;
-      // console.log(vm.name)
-      return vm.$options.render.call(vm)
+      vm.$el;
+      console.log('update', vnode);
     };
 
     Vue.prototype._c = function () {
+      return createElementVNode(this, ...arguments)
     };
 
     Vue.prototype._v = function () {
+      return createTextVNode(this, ...arguments)
     };
 
     Vue.prototype._s = function (value) {
+      if (typeof value !== 'object') {
+        return value
+      }
       return JSON.stringify(value)
     };
+
+    Vue.prototype._render = function () {
+      // console.log(vm.name)
+      // 当渲染的时候会去实例中取值，我们就可以将属性和视图绑定在一起
+      return this.$options.render.call(this) // 通过ast语法转义
+    };
   }
-
-
   // Vue的核心流程 1) 创造了响应式数据 2) 模板转换成ast语法树 3) 将ast语法树转换成render函数 
   // 4) 后续每次数据更新可以只执行render 函数(无需再次执行ast转换的过程)
 
@@ -34,6 +68,7 @@
   // 根据生成的虚拟节点生成真实DOM
   function mountComponent(vm, el) {
     // console.log(vm)
+    vm.$el = el;
 
     // 1、调用render方法产生虚拟节点, 虚拟DOM
     vm._update(vm._render()); // vm._render()其实就是执行的 vm.render()
@@ -165,109 +200,87 @@
     return root
   }
 
-  const defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g; // 匹配到的内容就是我们表达式的变量
-  // vue3 采用的不是使用正则
-  // 对模板进行编译处理
-  // function parseHTML
-  // 对模板进行编译处理
+  function genProps(attrs) {
+      let str = '';// {name,value}
+      for (let i = 0; i < attrs.length; i++) {
+          let attr = attrs[i];
+          if (attr.name === 'style') {
+              // color:red;background:red => {color:'red'}
+              let obj = {};
+              attr.value.split(';').forEach(item => { // qs 库
+                  let [key, value] = item.split(':');
+                  obj[key] = value;
+              });
+              attr.value = obj;
+          }
+          str += `${attr.name}:${JSON.stringify(attr.value)},`; // a:b,c:d,
+      }
+      return `{${str.slice(0, -1)}}`
+  }
+  const defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g; // {{ asdsadsa }}  匹配到的内容就是我们表达式的变量
+  function gen(node) {
+      if (node.type === 1) {
+          return codegen(node);
+      } else {
+          // 文本
+          let text = node.text;
+          if (!defaultTagRE.test(text)) {
+              return `_v(${JSON.stringify(text)})`
+          } else {
+              //_v( _s(name)+'hello' + _s(name))
+              let tokens = [];
+              let match;
+              defaultTagRE.lastIndex = 0;
+              let lastIndex = 0;
+              // split
+              while (match = defaultTagRE.exec(text)) {
+                  let index = match.index; // 匹配的位置  {{name}} hello  {{name}} hello 
+                  if (index > lastIndex) {
+                      tokens.push(JSON.stringify(text.slice(lastIndex, index)));
+                  }
+                  tokens.push(`_s(${match[1].trim()})`);
+                  lastIndex = index + match[0].length;
+              }
+              if (lastIndex < text.length) {
+                  tokens.push(JSON.stringify(text.slice(lastIndex)));
+              }
+              return `_v(${tokens.join('+')})`
+          }
+      }
+  }
+  function genChildren(children) {
+      return children.map(child => gen(child)).join(',')
+  }
+  function codegen(ast) {
+      let children = genChildren(ast.children);
+      let code = (`_c('${ast.tag}',${ast.attrs.length > 0 ? genProps(ast.attrs) : 'null'
+        }${ast.children.length ? `,${children}` : ''
+        })`);
+
+      return code;
+  }
   function compileToFunction(template) {
 
-    // 1 将template 转换成ast 语法树
-    let ast = parseHTML(template);
-    // console.log(ast);
-    // console.log(ast);
-    // 2 生成render 方法（render 方法执行后的返回的结果就是虚拟dom）
-    /* 
-      _c: creatElement()
-      _v: 创建vnode
-      _s: 字符串
-      render() {
-        return _c('div', {id: 'app'}, _c('div', {style: {color: 'red'}}, _v(_s(name) + 'hello'),
-        _c('span', undefind, _v(_s(age)))))
-      }
-    */
+      // 1.就是将template 转化成ast语法树
+      let ast = parseHTML(template);
 
-    // 模板引擎的实现原理就是 with + new Function()
-    let code = codegen(ast);
-    console.log(code);
-    code = `with(this){return ${code}}`; // with 语句改变作用域范围(改变取值)
-    let render = new Function(code); // 根据代码生成函数
-    // console.log(render.toString());
-    return render
+      // 2.生成render方法 (render方法执行后的返回的结果就是 虚拟DOM)
+
+      // 模板引擎的实现原理 就是 with  + new Function
+
+      let code = codegen(ast);
+      code = `with(this){return ${code}}`;
+      let render = new Function(code); // 根据代码生成render函数
+
+      //  _c('div',{id:'app'},_c('div',{style:{color:'red'}},  _v(_s(vm.name)+'hello'),_c('span',undefined,  _v(_s(age))))
+
+      return render;
   }
 
-  function genProps(attrs) {
-    let str = ''; // name value
-    for (let i = 0; i < attrs.length; i++) {
-      let attr = attrs[i];
-      if (attr.name === 'style') {
-        // color: red; background: yellow => { color: 'red' }
-        let obj = {};
-        attr.value.split(';').forEach(item => {
-          let [key, value] = item.split(':');
-          obj[key] = value;
-        });
-        attr.value = obj;
-      }
 
-      str += `${attr.name}:${JSON.stringify(attr.value)},`; // a: b, c: d,
-    }
-    return `{${str.slice(0, -1)}}`
-  }
-
-  function genChildren(ast) {
-    const children = ast.children;
-    if (children) {
-      return children.map(child => genChild(child)).join(',')
-    } else {
-      return ''
-    }
-  }
-
-  function genChild(node) {
-    if (node.type === 1) { // 
-      return codegen(node)
-    } else {
-      // 文本
-      let text = node.text;
-      if (!defaultTagRE.test(text)) {
-        return `_v(${JSON.stringify(text)})`
-      } else {
-        // _v( _s(name) + 'hello' + _s(name))
-        let tokens = [];
-        let match;
-        defaultTagRE.lastIndex = 0; // exec 使用的时候 正则中存在 /g 的话会记录位置的所以需要重置
-        let lastIndex = 0;
-        while(match = defaultTagRE.exec(text)) {
-          // console.log(match, '----');
-          let index = match.index;
-          if (index > lastIndex) {
-            tokens.push(JSON.stringify(text.slice(lastIndex, index)));
-          }
-
-          tokens.push(`_s(${match[1].trim()})`);
-          lastIndex = index + match[0].length;
-        }
-        if (lastIndex < text.length) {
-          tokens.push(JSON.stringify(text.slice(lastIndex)));
-        }
-        return `_v(${tokens.join('+')})`
-      }
-    }
-  }
-
-  function codegen(ast) {
-    // console.log(ast);
-    let children = genChildren(ast);
-    let code = (`_c('${ast.tag}', ${
-      ast.attrs.length > 0 ? genProps(ast.attrs) : 'null'
-    }${
-      ast.children.length ? `,${children}` : ''
-    }
-  )`);
-    
-    return code 
-  }
+  // <xxx
+  // <namepsace:xxx
+  // color   =   "asdsada"     c= 'asdasd'  d=  asdasdsa
 
   // 我们希望重写数组中的部分方法
 
@@ -456,7 +469,7 @@
         }
       }
 
-      mountComponent(vm); // 组件的挂载
+      mountComponent(vm, el); // 组件的挂载
 
       // ops.render // 最终可以获取render 方法
 

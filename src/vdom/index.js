@@ -1,9 +1,25 @@
 // h() _c
-export function creatElementVNode() {
-  
+export function createElementVNode(vm, tag, data, ...children) {
+  if (data == null) {
+    data = {}
+  }
+  // console.log(vm, arg, '----');
+  let key = data.key
+  if (key) {
+    delete data.key
+  }
+  return vnode(vm, tag, key, data, children)
 }
 
 // _v()
-export function creatTextVNode() {
-  
+export function createTextVNode(vm, text) {
+  return vnode(vm, undefined, undefined, undefined, undefined, text)
+}
+
+// 和ast一样？ ast做的是语法层面的转化， 他描述的是语法本身（可以描述js， css， html）
+// 我们的虚拟dom 是描述dom元素的， 可以增加一些自定义属性（描述dom的）
+function vnode(vm, tag, key, data, children, text) {
+  return {
+    vm, tag, key, data, children, text
+  }
 }
