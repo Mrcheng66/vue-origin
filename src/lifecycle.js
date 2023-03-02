@@ -1,7 +1,7 @@
 import { createElementVNode, createTextVNode } from "./vdom/index"
 
 function patch(vnode, el) {
-  
+  console.log(vnode)
 }
 
 export function initLifeCycle(Vue) {
