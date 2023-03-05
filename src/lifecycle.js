@@ -49,6 +49,8 @@ export function patch(oldVnode, vnode) {
     */
     parenElm.insertBefore(newElm, elm.nextSibling) // 先插入新的 el
     parenElm.removeChild(elm) // 删除老的 el
+
+    return newElm
   } else {
     // diff算法
   }
@@ -63,7 +65,7 @@ export function initLifeCycle(Vue) {
     const vm = this
     const el = vm.$el
 
-    patch(el, vnode)
+    vm.$el = patch(el, vnode)
     console.log('update', vnode)
   }
 
