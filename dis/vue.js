@@ -4,6 +4,42 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
+  let id$1 = 0;
+  class Dep {
+    // 属性的dep要收集watcher
+    constructor() {
+      this.id = id$1++; // 属性dep要收集watcher
+      this.subs = []; // 这里存放这当前属性对应的watcher 有哪些
+    }
+    depend() {
+      // this.subs.push(Dep.target) // 这里我们不希望放重复的watcher，而且方才只是一个单向的关系
+      //（因为可能在模板中多次使用同一属性， 没有必要多次收集watcher）
+      // dep -> watcher (watcher 记录dep)
+      
+      Dep.target.addDep(this); // Dep.target 这个是watcher 哦, 就是让watcher记住dep了
+      
+      // dep 和 watcher 是一个多对多的关系（一个属性可以在多个组件中使用 dep -》 多个watcher）
+      // 一个组件中由多个属性组成（一个watcher -》 对应多个dep）
+    }
+
+    addSub(watcher) {
+      this.subs.push(watcher);
+    }
+
+    notify() {
+      this.subs.forEach(wathcer => {
+        wathcer.update();
+      });
+    }
+  }
+
+  Dep.target = null;
+
+  // 1 当我们创建渲染watcher的时候 我们会把当前的渲染watcher 放到Dep.target 上
+  // 2 调用_render() 会取值 走到get上
+
+
+  // 每个属性都有一个dep（属性就是被观察者）， watcher就是观察者（属性变化了会通知观察者来更新） -》 观察者模式
   let id = 0;
   class Watcher {
     constructor(vm, callback, options) {
@@ -11,12 +47,28 @@
       this.vm = vm;
       this.renderWatcher = options;
       this.getter = callback; // geter 意味着调用这个函数可以触发取值操作
-
+      this.deps = []; // 让watcher记住dep也是为了组件卸载和计算属性的实现
+      this.depsId = new Set();
       this.get();
     }
 
     get() {
-      this.getter();
+      Dep.target = this; // 静态属性就是只有一份
+      this.getter(); // 会去vm上取值
+      Dep.target = null; // 渲染完毕就清空（清空是为了保证只有在模板里面才收集，在vm上获取属性是不收集的）
+    }
+
+    addDep(dep) {
+      let id = dep.id;
+      if(!this.depsId.has(id)) {
+        this.deps.push(dep);
+        this.depsId.add(id);
+        dep.addSub(this); // watcher记住了dep了而且去重了, 此时dep 也记住watcher了
+      }
+    }
+
+    update() {
+      this.get(); // 重新渲染更新
     }
   }
 
@@ -151,7 +203,8 @@
     // 3、插入到el元素中
 
     // 依赖收集监听
-    new Watcher(vm, updateComponent, true /* isRenderWatcher */);
+    const watchers = new Watcher(vm, updateComponent, true /* isRenderWatcher */);
+    console.log(watchers);
   }
 
   // Regular Expressions for parsing tags and attributes
@@ -457,15 +510,23 @@
 
   function defineReactive(target, key, value) { // 闭包 属性劫持
     observe(value);  // 递归， 比如data中的属性还是一个对象的场景
+    let dep = new Dep(); // 怎么讲dep和watcher关联起来呢？
+    // (默认会在渲染的时候创建一个watcher， 会将这个watcher 放在Dep全局静态属性target上)，之后执行_render
+    // 去取值， 让当前的dep记住当前的watcher
     Object.defineProperty(target, key, {
       get() {
+        if (Dep.target) {
+          dep.depend(); // 让这个属性的收集器记住这个watcher
+        }
         // 取值的时候会执行get
         return value
       },
       set(newVal) {
         // 修改的时候会执行
         if (newVal === value) return
+        observe(newVal);
         value = newVal;
+        dep.notify(); // 通知更新
       }
     });
   }

@@ -1,4 +1,5 @@
 import { newArrayProto } from "./array";
+import Dep from "./dep";
 
 export function observe(data) {
   // 劫持数据
@@ -50,15 +51,23 @@ class Observer {
 
 export function defineReactive(target, key, value) { // 闭包 属性劫持
   observe(value)  // 递归， 比如data中的属性还是一个对象的场景
+  let dep = new Dep() // 怎么讲dep和watcher关联起来呢？
+  // (默认会在渲染的时候创建一个watcher， 会将这个watcher 放在Dep全局静态属性target上)，之后执行_render
+  // 去取值， 让当前的dep记住当前的watcher
   Object.defineProperty(target, key, {
     get() {
+      if (Dep.target) {
+        dep.depend(); // 让这个属性的收集器记住这个watcher
+      }
       // 取值的时候会执行get
       return value
     },
     set(newVal) {
       // 修改的时候会执行
       if (newVal === value) return
+      observe(newVal)
       value = newVal
+      dep.notify() // 通知更新
     }
   })
 }

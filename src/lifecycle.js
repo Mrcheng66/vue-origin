@@ -108,5 +108,6 @@ export function mountComponent(vm, el) {
   // 3、插入到el元素中
 
   // 依赖收集监听
-  new Watcher(vm, updateComponent, true /* isRenderWatcher */)
+  const watchers = new Watcher(vm, updateComponent, true /* isRenderWatcher */)
+  console.log(watchers);
 }
