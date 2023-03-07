@@ -12,6 +12,14 @@
   </style>
 </head>
 <body>
+  <!-- 
+    我们可以给模板中的属性 增加一个收集器 dep
+    页面渲染的时候, 我们将渲染逻辑封装到watcher中  vm._update(vm._render())
+    让dep记住这个watcher即可, 稍后属性变化了可以找到对应的dep中存放的watcher进行重新渲染
+
+    组件化的好处: 复用  方便维护  局部更新
+   -->
+  <!-- 观察者模式 -->
   <div id="app" style="color:red;background:pink;">
     <span style="color:red;">{{name}} hello</span>
     <p class="age">world {{age}}</p>
