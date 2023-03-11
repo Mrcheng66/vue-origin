@@ -67,7 +67,7 @@ export function initLifeCycle(Vue) {
     const el = vm.$el
 
     vm.$el = patch(el, vnode)
-    console.log('update', vnode)
+    // console.log('update', vnode)
   }
 
   Vue.prototype._c = function () {
@@ -108,6 +108,7 @@ export function mountComponent(vm, el) {
   // 3、插入到el元素中
 
   // 依赖收集监听
-  const watchers = new Watcher(vm, updateComponent, true /* isRenderWatcher */)
-  console.log(watchers);
+  // const watchers = new Watcher(vm, updateComponent, true /* isRenderWatcher */)
+  // console.log(watchers);
+  new Watcher(vm, updateComponent, true /* isRenderWatcher */)
 }

@@ -33,8 +33,65 @@ class Watcher {
   }
 
   update() {
-    this.get() // 重新渲染更新
+    // this.get() // 重新渲染更新 （不能直接同步更新，多次set值会重复渲染）
+    queueWatcher(this)
   }
+
+  run() {
+    console.log('update');
+    this.get()
+  }
+}
+
+let queue = []
+let has = {}
+let pending = false; // 防抖
+
+function flushSchedulerQueue() {
+  let fulshQueue = queue.slice(0)
+  queue = []
+  has = {}
+  pending = false
+  fulshQueue.forEach(q => 
+    q.run()
+  )
+}
+
+function queueWatcher(watcher) {
+  const id = watcher.id
+  if (!has[id]) {
+    queue.push(watcher)
+    has[id] = true
+    // 不管update 执行多少次，只执行一轮刷新操作
+
+    if (!pending) {
+      // setTimeout(flushSchedulerQueue, 0) // 不能直接写异步的宏任务，因为异步更新的时候获取不到真实dom数据
+      nextTick(flushSchedulerQueue, 0)
+      pending = true
+    }
+  }
+}
+
+let callbacks = []
+let waiting = false
+export function nextTick(cb) { // 先执行内部还是先用户的？
+  callbacks.push(cb) // 维护nextTick中的callback方法
+  if (!waiting) {
+    setTimeout(() => {
+      flushCallBacks() // 最后一起刷新
+    }, 0)
+    waiting = true
+  }
+}
+// nextTick没有直接使用某个api  而是采用优雅降级的方式
+// 内部先采用的是Promise （ie不兼容）， 在看MutationObserver ， 
+// 还不支持可以考虑 ie专属的 setImmediate 最后 setTimeOut
+
+function flushCallBacks() {
+  let cbs = callbacks.slice(0)
+  callbacks = []
+  waiting = false
+  cbs.forEach(cb => cb())
 }
 
 // 需要给每个属性增加一个dep  目的就是收集watcher
