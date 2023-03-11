@@ -5,11 +5,26 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document</title>
+  <style>
+    .age {
+      font-weight: 800;
+    }
+  </style>
 </head>
 <body>
-  <div id="app" style="background-color: yellow;">
-    <div style="color:red">{{ name }} hello</div>
-    <div>{{ age }}</div>
+  <!-- 
+    我们可以给模板中的属性 增加一个收集器 dep
+    页面渲染的时候, 我们将渲染逻辑封装到watcher中  vm._update(vm._render())
+    让dep记住这个watcher即可, 稍后属性变化了可以找到对应的dep中存放的watcher进行重新渲染
+
+    组件化的好处: 复用  方便维护  局部更新
+   -->
+  <!-- 观察者模式 -->
+  <div id="app" style="color:red;background:pink;">
+    <span style="color:red;">{{name}} hello</span>
+    <p class="age">world {{age}}</p>
+    {{name}}{{age}}{{age}}{{age}}
+    <i key="1212">vue</i>
   </div>
   <script src="./vue.js"></script>
   <script>
@@ -24,6 +39,24 @@
       },
       // template: '<div>hello</div>'
     })
+
+    // 属性和我们的视图关联起来， 做到数据变化可以自动更新视图（观察者模式）
+    setTimeout(() => {
+      vm.name = 'Bryant',
+      vm.age = 18
+      vm.age = 28
+      vm.age = 38
+      vm.age = 48 // 事件环  同步任务  异步任务
+
+      // 可能有多个组件要更新
+      
+      // vm._update(vm._render()) // 数据变化后可以自己重新渲染
+    }, 1000);
+
+    // 1）将数据先处理成响应式 initState（针对对象来说主要是增加defineProperty 针对数组就是重写方法）
+    // 2）模板编译：将模板先转换成ast语法树， 将ast语法树生成 render 方法
+    // 3）调用render方法 会进行取值操作 产生对应的虚拟DOM render（_c('div', null, _v(name))）触发get方法
+    // 4）将虚拟DOM渲染成真实DOM
 
     // 1。模板引擎 性能差 需要正则匹配替换 1。0 的时候 没有引入虚拟DOM的概念
     // 2采用虚拟DOM  数据变化后比较虚拟DOM的差异 最后更新需要更新的地方
