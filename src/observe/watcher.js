@@ -72,21 +72,44 @@ function queueWatcher(watcher) {
   }
 }
 
+// nextTick没有直接使用某个api  而是采用优雅降级的方式
+// 内部先采用的是Promise （ie不兼容）， 在看MutationObserver ， 
+// 还不支持可以考虑 ie专属的 setImmediate 最后 setTimeOut
 let callbacks = []
 let waiting = false
 export function nextTick(cb) { // 先执行内部还是先用户的？
   callbacks.push(cb) // 维护nextTick中的callback方法
   if (!waiting) {
-    setTimeout(() => {
-      flushCallBacks() // 最后一起刷新
-    }, 0)
+    // setTimeout(() => {
+    //   flushCallBacks() // 最后一起刷新
+    // }, 0)
+    timerFunc()
     waiting = true
   }
 }
-// nextTick没有直接使用某个api  而是采用优雅降级的方式
-// 内部先采用的是Promise （ie不兼容）， 在看MutationObserver ， 
-// 还不支持可以考虑 ie专属的 setImmediate 最后 setTimeOut
-
+let timerFunc;
+if (Promise) {
+  timerFunc = () => {
+    Promise.resolve().then(flushCallBacks)
+  }
+} else if (MutationObserver) {
+  let observer = new MutationObserver(flushCallBacks)
+  let textNode = document.createTextNode(1);
+  observer.observe(textNode, {
+    characterData: true
+  })
+  timerFunc = () => {
+    textNode.textContent = 2
+  }
+} else if (setImmediate) {
+  timerFunc = () => {
+    setImmediate(flushCallBacks)
+  }
+} else {
+  timerFunc = () => {
+    setTimeout(flushCallBacks)
+  }
+}
 function flushCallBacks() {
   let cbs = callbacks.slice(0)
   callbacks = []
