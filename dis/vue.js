@@ -288,6 +288,15 @@
     new Watcher(vm, updateComponent, true /* isRenderWatcher */);
   }
 
+  function callHook(vm, hook) { // 调用钩子函数
+    const handlers = vm.$options[hook];
+    if(handlers) {
+      handlers.forEach(handler => {
+        handler.call(vm);
+      });
+    }
+  }
+
   // Regular Expressions for parsing tags and attributes
   const ncname = `[a-zA-Z_][\\-\\.0-9_a-zA-Z]*`;
   const qnameCapture = `((?:${ncname}\\:)?${ncname})`;
@@ -647,15 +656,59 @@
     });
   }
 
+  const strats = {};
+    const LIFE_CYCLE = ["beforeCreate", "created"];
+    LIFE_CYCLE.forEach((hook) => {
+      strats[hook] = function (p, c) {
+        if (c) {
+          if (p) {
+            return p.concat(c);
+          } else {
+            return [c];
+          }
+        } else {
+          return p;
+        }
+      };
+    });
+  function mergeOptions(parent, child) {
+    const options = {};
+    for (const key in parent) {
+      mergeField(key);
+    }
+
+    for (const key in child) {
+      if (!parent.hasOwnProperty(key)) {
+        mergeField(key);
+      }
+    }
+
+    function mergeField(key) {
+      // 策略模式 避免if/else  因为mixin中可能存在多个和组件内同类型的键值的key （created，watch。。。）
+      if (strats[key]) {
+        options[key] = strats[key](parent[key], child[key]);
+      } else {
+        // 优先采用儿子， 再采用父亲
+        options[key] = child[key] || parent[key];
+      }
+    }
+
+    return options
+  }
+
   function initMixin(Vue) {
     Vue.prototype._init = function (options) {
       console.log(this); // 这里的this都是实例
       // vm.$options就是获取用户的配置选项
       const vm = this;
-      vm.$options = options; // 将用户的选项挂载到实例上
+
+      // 我们定义的全局指令/过滤器 都会挂在实例上
+      vm.$options = mergeOptions(this.constructor.options,options); // 将用户的选项挂载到实例上
+      callHook(vm, 'befoerCreate');
       // 初始化状态
       initState(vm);
-
+      callHook(vm, 'created');
+      // console.log(vm.$options);
       // 实现数据挂载
       if (options.el) {
         vm.$mount(options.el);
@@ -697,12 +750,28 @@
     };
   }
 
+  function initGlobalAPI(Vue) {
+    // 静态属性
+    Vue.options = {};
+    
+    Vue.mixin = function (mixin) {
+      // 我们期望将用户的选项和 全局API进行合并
+      // {} {created: function(){}} => {created: [fn()]}
+
+      this.options = mergeOptions(this.options, mixin);
+
+      return this;
+    };
+  }
+
   function Vue(option) {
     this._init(option);
   }
   Vue.prototype.$nextTick = nextTick;
   initMixin(Vue);
   initLifeCycle(Vue);
+
+  initGlobalAPI(Vue);
 
   return Vue;
 
