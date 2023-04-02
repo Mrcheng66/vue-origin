@@ -1,7 +1,7 @@
 import { callHook, mountComponent } from "./lifecycle";
 import { compileToFunction } from "./compiler/index";
 import { initState } from "./state";
-import { mergeOptions } from "../utils";
+import { mergeOptions } from "./utils";
 
 export function initMixin(Vue) {
   Vue.prototype._init = function (options) {

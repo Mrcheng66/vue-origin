@@ -1,7 +1,7 @@
 import { initLifeCycle } from "./lifecycle"
 import { initMixin } from "./init"
 import { nextTick } from "./observe/watcher"
-import { initGlobalAPI } from "../globalApi"
+import { initGlobalAPI } from "./globalApi"
 
 function Vue(option) {
   this._init(option)

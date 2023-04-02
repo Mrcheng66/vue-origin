@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <div id="app">
+    <p>{{hobby}}</p>
+    <p>{{sexOption}}</p>
+  </div>
+</head>
+<body>
+  <script src="./vue.js"></script>
+  <script>
+    const vm = new Vue({
+      el: '#app', // 我们将数据解析到el上
+      data() {
+        return {
+          hobby: ['eat', 'drink', { a: 123 }, ['a', 'b']], // 给数组本身增加dep，如果数组新增了某一项 我们可以出发dep更新
+          sexOption: { val1: '男' } // 给对象增加dep，如果后续添加了属性  我们可以出发dep更新
+        }
+      },
+    })
+
+
+    setTimeout(() => {
+      // vm.hobby.push(324,433,1232)
+      vm.hobby[3].push('c')
+
+      // vm.sexOption.val2 = '女'
+
+      // vm.sexOption.__ob__.dep.notify() // $set 原理
+    }, 2000)
+  </script>
+</body>
+</html>

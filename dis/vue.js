@@ -541,11 +541,13 @@
       // 对新增的内容再次进行观测 inserted 是个数组哦
       // 是不是想调用observeArray(data) 就可以了， 但是访问不到🐶。。。, 只能通过额外挂载参数的方法
       if (inserted) {
-        // 这里的this 不就是外部的data吗，因为外部是data调用的啊，
+        // 这里的this 不就是外部的data吗，因为外部是data调用的 
         // 所以只能在外部的class Observer 中给data加上一个属性这里就能访问到observeArray(）了
         // console.log(this);
         ob.observeArray(inserted);
       }
+
+      ob.dep.notify(); // 数组变化了  通知对应的watcher实现更新逻辑
       return result
     };
   });
@@ -567,6 +569,9 @@
   }
   class Observer {
     constructor(data) {
+      // 给每个对象都新增收集功能
+      this.dep = new Dep();
+
       // object.definerProperty 只能劫持已经存在的数据，新增的和删除的并不能感知。
       // vue2 里面会为此单独设置$set $delete
       // data.__ob__ = this // 给数据加了一个标识，如果数据上有__ob__则说明这个属性被观测过
@@ -598,8 +603,18 @@
     }
   }
 
+  function dependArray(value) {
+    for (let i = 0; i < value.length; i++) {
+      const current = value[i];
+      current.__ob__ &&  current.__ob__.dep.depend(); // 
+      if (Array.isArray(current)) {
+        dependArray(current );
+      }
+    }
+  }
+
   function defineReactive(target, key, value) { // 闭包 属性劫持
-    observe(value);  // 递归， 比如data中的属性还是一个对象的场景
+    const childOb = observe(value);  // 递归， 比如data中的属性还是一个对象的场景,   childOb.dep用来收集依赖的
     let dep = new Dep(); // 怎么讲dep和watcher关联起来呢？
     // (默认会在渲染的时候创建一个watcher， 会将这个watcher 放在Dep全局静态属性target上)，之后执行_render
     // 去取值， 让当前的dep记住当前的watcher
@@ -607,6 +622,14 @@
       get() {
         if (Dep.target) {
           dep.depend(); // 让这个属性的收集器记住这个watcher
+
+          if (childOb) {
+            childOb.dep.depend();
+
+            if (Array.isArray(value)) { // 如果劫持数组中还有数组的场景
+              dependArray(value);
+            }
+          }
         }
         // 取值的时候会执行get
         return value
