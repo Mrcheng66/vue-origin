@@ -52,6 +52,7 @@ class Observer {
   }
 }
 
+// 深层次嵌套会递归，递归多了性能就差，不存在属性监听不到，存在的属性要重写方法
 function dependArray(value) {
   for (let i = 0; i < value.length; i++) {
     const current = value[i];
