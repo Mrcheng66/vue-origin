@@ -35,6 +35,17 @@
 
   Dep.target = null;
 
+  let stack = [];
+  function pushTarget(watcher) {
+    stack.push(watcher);
+    Dep.target = watcher;
+  }
+
+  function popTarget() {
+    stack.pop();
+    Dep.target = stack[stack.length - 1];
+  }
+
   // 1 当我们创建渲染watcher的时候 我们会把当前的渲染watcher 放到Dep.target 上
   // 2 调用_render() 会取值 走到get上
 
@@ -49,13 +60,29 @@
       this.getter = callback; // geter 意味着调用这个函数可以触发取值操作
       this.deps = []; // 让watcher记住dep也是为了组件卸载和计算属性的实现
       this.depsId = new Set();
-      this.get();
+      
+      this.lazy = options.lazy;
+      this.dirty = this.lazy; // 缓存值
+      this.lazy ? undefined : this.get();
     }
-
+    // 判断dirty重新执行
+    evaluate() {
+      this.value = this.get(); // 获取用户函数的返回值，并且还要标记为脏
+      this.dirty = false;
+    }
     get() {
-      Dep.target = this; // 静态属性就是只有一份
-      this.getter(); // 会去vm上取值
-      Dep.target = null; // 渲染完毕就清空（清空是为了保证只有在模板里面才收集，在vm上获取属性是不收集的）
+      // Dep.target = this // 静态属性就是只有一份
+      pushTarget(this);
+      let value = this.getter.call(this.vm); // 会去vm上取值
+      // Dep.target = null // 渲染完毕就清空（清空是为了保证只有在模板里面才收集，在vm上获取属性是不收集的）
+      popTarget();
+      return value
+    }
+    depend() {
+      let i = this.deps.length;
+      while (i--) {
+        this.deps[i].depend(); // 让计算属性watcher 也收集渲染watcher
+      }
     }
 
     addDep(dep) {
@@ -68,8 +95,13 @@
     }
 
     update() {
-      // this.get() // 重新渲染更新 （不能直接同步更新，多次set值会重复渲染）
-      queueWatcher(this);
+      if (this.lazy) {
+        // 如果是计算属性 依赖的值变化了 就标记计算属性是脏值了
+        this.dirty = true;  
+      } else {
+        // this.get() // 重新渲染更新 （不能直接同步更新，多次set值会重复渲染）
+        queueWatcher(this);
+      }
     }
 
     run() {
@@ -107,21 +139,44 @@
     }
   }
 
+  // nextTick没有直接使用某个api  而是采用优雅降级的方式
+  // 内部先采用的是Promise （ie不兼容）， 在看MutationObserver ， 
+  // 还不支持可以考虑 ie专属的 setImmediate 最后 setTimeOut
   let callbacks = [];
   let waiting = false;
   function nextTick(cb) { // 先执行内部还是先用户的？
     callbacks.push(cb); // 维护nextTick中的callback方法
     if (!waiting) {
-      setTimeout(() => {
-        flushCallBacks(); // 最后一起刷新
-      }, 0);
+      // setTimeout(() => {
+      //   flushCallBacks() // 最后一起刷新
+      // }, 0)
+      timerFunc();
       waiting = true;
     }
   }
-  // nextTick没有直接使用某个api  而是采用优雅降级的方式
-  // 内部先采用的是Promise （ie不兼容）， 在看MutationObserver ， 
-  // 还不支持可以考虑 ie专属的 setImmediate 最后 setTimeOut
-
+  let timerFunc;
+  if (Promise) {
+    timerFunc = () => {
+      Promise.resolve().then(flushCallBacks);
+    };
+  } else if (MutationObserver) {
+    let observer = new MutationObserver(flushCallBacks);
+    let textNode = document.createTextNode(1);
+    observer.observe(textNode, {
+      characterData: true
+    });
+    timerFunc = () => {
+      textNode.textContent = 2;
+    };
+  } else if (setImmediate) {
+    timerFunc = () => {
+      setImmediate(flushCallBacks);
+    };
+  } else {
+    timerFunc = () => {
+      setTimeout(flushCallBacks);
+    };
+  }
   function flushCallBacks() {
     let cbs = callbacks.slice(0);
     callbacks = [];
@@ -263,6 +318,15 @@
     // const watchers = new Watcher(vm, updateComponent, true /* isRenderWatcher */)
     // console.log(watchers);
     new Watcher(vm, updateComponent, true /* isRenderWatcher */);
+  }
+
+  function callHook(vm, hook) { // 调用钩子函数
+    const handlers = vm.$options[hook];
+    if(handlers) {
+      handlers.forEach(handler => {
+        handler.call(vm);
+      });
+    }
   }
 
   // Regular Expressions for parsing tags and attributes
@@ -509,11 +573,13 @@
       // 对新增的内容再次进行观测 inserted 是个数组哦
       // 是不是想调用observeArray(data) 就可以了， 但是访问不到🐶。。。, 只能通过额外挂载参数的方法
       if (inserted) {
-        // 这里的this 不就是外部的data吗，因为外部是data调用的啊，
+        // 这里的this 不就是外部的data吗，因为外部是data调用的 
         // 所以只能在外部的class Observer 中给data加上一个属性这里就能访问到observeArray(）了
         // console.log(this);
         ob.observeArray(inserted);
       }
+
+      ob.dep.notify(); // 数组变化了  通知对应的watcher实现更新逻辑
       return result
     };
   });
@@ -535,6 +601,9 @@
   }
   class Observer {
     constructor(data) {
+      // 给每个对象都新增收集功能
+      this.dep = new Dep();
+
       // object.definerProperty 只能劫持已经存在的数据，新增的和删除的并不能感知。
       // vue2 里面会为此单独设置$set $delete
       // data.__ob__ = this // 给数据加了一个标识，如果数据上有__ob__则说明这个属性被观测过
@@ -566,8 +635,19 @@
     }
   }
 
+  // 深层次嵌套会递归，递归多了性能就差，不存在属性监听不到，存在的属性要重写方法
+  function dependArray(value) {
+    for (let i = 0; i < value.length; i++) {
+      const current = value[i];
+      current.__ob__ &&  current.__ob__.dep.depend(); // 
+      if (Array.isArray(current)) {
+        dependArray(current );
+      }
+    }
+  }
+
   function defineReactive(target, key, value) { // 闭包 属性劫持
-    observe(value);  // 递归， 比如data中的属性还是一个对象的场景
+    const childOb = observe(value);  // 递归， 比如data中的属性还是一个对象的场景,   childOb.dep用来收集依赖的
     let dep = new Dep(); // 怎么讲dep和watcher关联起来呢？
     // (默认会在渲染的时候创建一个watcher， 会将这个watcher 放在Dep全局静态属性target上)，之后执行_render
     // 去取值， 让当前的dep记住当前的watcher
@@ -575,6 +655,14 @@
       get() {
         if (Dep.target) {
           dep.depend(); // 让这个属性的收集器记住这个watcher
+
+          if (childOb) {
+            childOb.dep.depend();
+
+            if (Array.isArray(value)) { // 如果劫持数组中还有数组的场景
+              dependArray(value);
+            }
+          }
         }
         // 取值的时候会执行get
         return value
@@ -592,17 +680,20 @@
   function initState(vm) {
     // 获取所有选项
     const opts = vm.$options;
-
     if (opts.data) {
+      // 数据
       initData(vm);
     }
-
+    if (opts.computed) {
+      // 计算属性
+      initComputed(vm);
+    }
   }
 
   function initData(vm) {
     let data = vm.$options.data; // data可能是函数或者对象
 
-    data = typeof data === 'function' ? data.call(vm) : data;
+    data = typeof data === "function" ? data.call(vm) : data;
 
     // 下面的方法进行了属性 劫持但是在vm实例上并不会有data 属性直接访问 就是不能直接像项目里面 this.** 访问数据， 所以额外定义一个参数
     vm._data = data; // 这样又不便于直接的操作， 所以额外设置一层 _data的代理
@@ -610,18 +701,102 @@
     observe(data);
 
     // 将vm._data 用vm来代理
-    Object.keys(data).forEach(key => proxy(vm, '_data', key));
+    Object.keys(data).forEach((key) => proxy(vm, "_data", key));
   }
 
   function proxy(vm, target, key) {
     Object.defineProperty(vm, key, {
       get() {
-        return vm[target][key]
+        return vm[target][key];
       },
       set(newVal) {
         vm[target][key] = newVal;
-      }
+      },
     });
+  }
+
+  function initComputed(vm) {
+    const computed = vm.$options.computed;
+    const watcher = vm._computedWatchers = {};
+    for (const key in computed) {
+      if (Object.hasOwnProperty.call(computed, key)) {
+        const useDef = computed[key];
+        
+        // 我们需要监控 计算属性中get的变化
+        const fn = typeof useDef === "function" ? useDef : useDef.get;
+        // 如果直接new Watcher 默认就会执行fn， 所以在options中增加一个标识lazy
+        // 将属性和watcher对应起来
+        watcher[key] = new Watcher(vm, fn, {lazy: true});
+
+        defineComputed(vm, key, useDef);
+      }
+    }
+  }
+
+  function defineComputed(target, key, useDef) {
+    typeof useDef === "function" ? useDef : useDef.get;
+    const setter = useDef.set || (() => {});
+    // console.log(getter, setter);
+    Object.defineProperty(target, key, {
+      get: creatComputedGetter(key),
+      set: setter,
+    });
+  }
+
+  // 计算属性根本不会收集依赖，只会让自己的依赖属性去收集依赖
+  function creatComputedGetter(key) {
+    // 我们需要监测是否要执行这个getter
+    return function () {
+      const watcher = this._computedWatchers[key]; // 获取对应属性的watcher
+      if (watcher.dirty) {
+        // 如果是脏的就去执行用户传入的函数
+        watcher.evaluate(); // 直接掉get不合适因为存在值变化重新执行的情况
+      }
+      if (Dep.target) { // 计算属性出栈后 还要渲染watcher  我应该让计算属性watcher里面的属性也去收集上层watcher（渲染watcher）
+          watcher.depend();      
+      }
+      return watcher.value // 最后返回的是watcher上的值
+    }
+  }
+
+  const strats = {};
+    const LIFE_CYCLE = ["beforeCreate", "created"];
+    LIFE_CYCLE.forEach((hook) => {
+      strats[hook] = function (p, c) {
+        if (c) {
+          if (p) {
+            return p.concat(c);
+          } else {
+            return [c];
+          }
+        } else {
+          return p;
+        }
+      };
+    });
+  function mergeOptions(parent, child) {
+    const options = {};
+    for (const key in parent) {
+      mergeField(key);
+    }
+
+    for (const key in child) {
+      if (!parent.hasOwnProperty(key)) {
+        mergeField(key);
+      }
+    }
+
+    function mergeField(key) {
+      // 策略模式 避免if/else  因为mixin中可能存在多个和组件内同类型的键值的key （created，watch。。。）
+      if (strats[key]) {
+        options[key] = strats[key](parent[key], child[key]);
+      } else {
+        // 优先采用儿子， 再采用父亲
+        options[key] = child[key] || parent[key];
+      }
+    }
+
+    return options
   }
 
   function initMixin(Vue) {
@@ -629,10 +804,14 @@
       console.log(this); // 这里的this都是实例
       // vm.$options就是获取用户的配置选项
       const vm = this;
-      vm.$options = options; // 将用户的选项挂载到实例上
+
+      // 我们定义的全局指令/过滤器 都会挂在实例上
+      vm.$options = mergeOptions(this.constructor.options,options); // 将用户的选项挂载到实例上
+      callHook(vm, 'befoerCreate');
       // 初始化状态
       initState(vm);
-
+      callHook(vm, 'created');
+      // console.log(vm.$options);
       // 实现数据挂载
       if (options.el) {
         vm.$mount(options.el);
@@ -674,12 +853,28 @@
     };
   }
 
+  function initGlobalAPI(Vue) {
+    // 静态属性
+    Vue.options = {};
+    
+    Vue.mixin = function (mixin) {
+      // 我们期望将用户的选项和 全局API进行合并
+      // {} {created: function(){}} => {created: [fn()]}
+
+      this.options = mergeOptions(this.options, mixin);
+
+      return this;
+    };
+  }
+
   function Vue(option) {
     this._init(option);
   }
   Vue.prototype.$nextTick = nextTick;
   initMixin(Vue);
   initLifeCycle(Vue);
+
+  initGlobalAPI(Vue);
 
   return Vue;
 

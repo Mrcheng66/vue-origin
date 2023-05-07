@@ -112,3 +112,12 @@ export function mountComponent(vm, el) {
   // console.log(watchers);
   new Watcher(vm, updateComponent, true /* isRenderWatcher */)
 }
+
+export function callHook(vm, hook) { // 调用钩子函数
+  const handlers = vm.$options[hook];
+  if(handlers) {
+    handlers.forEach(handler => {
+      handler.call(vm)
+    })
+  }
+}

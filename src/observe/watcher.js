@@ -1,4 +1,4 @@
-import Dep from "./dep";
+import Dep, { popTarget, pushTarget } from "./dep";
 
 // 1 当我们创建渲染watcher的时候 我们会把当前的渲染watcher 放到Dep.target 上
 // 2 调用_render() 会取值 走到get上
@@ -14,13 +14,29 @@ class Watcher {
     this.getter = callback // geter 意味着调用这个函数可以触发取值操作
     this.deps = [] // 让watcher记住dep也是为了组件卸载和计算属性的实现
     this.depsId = new Set()
-    this.get()
+    
+    this.lazy = options.lazy
+    this.dirty = this.lazy // 缓存值
+    this.lazy ? undefined : this.get()
   }
-
+  // 判断dirty重新执行
+  evaluate() {
+    this.value = this.get() // 获取用户函数的返回值，并且还要标记为脏
+    this.dirty = false
+  }
   get() {
-    Dep.target = this // 静态属性就是只有一份
-    this.getter() // 会去vm上取值
-    Dep.target = null // 渲染完毕就清空（清空是为了保证只有在模板里面才收集，在vm上获取属性是不收集的）
+    // Dep.target = this // 静态属性就是只有一份
+    pushTarget(this)
+    let value = this.getter.call(this.vm) // 会去vm上取值
+    // Dep.target = null // 渲染完毕就清空（清空是为了保证只有在模板里面才收集，在vm上获取属性是不收集的）
+    popTarget(this)
+    return value
+  }
+  depend() {
+    let i = this.deps.length
+    while (i--) {
+      this.deps[i].depend() // 让计算属性watcher 也收集渲染watcher
+    }
   }
 
   addDep(dep) {
@@ -33,8 +49,13 @@ class Watcher {
   }
 
   update() {
-    // this.get() // 重新渲染更新 （不能直接同步更新，多次set值会重复渲染）
-    queueWatcher(this)
+    if (this.lazy) {
+      // 如果是计算属性 依赖的值变化了 就标记计算属性是脏值了
+      this.dirty = true  
+    } else {
+      // this.get() // 重新渲染更新 （不能直接同步更新，多次set值会重复渲染）
+      queueWatcher(this)
+    }
   }
 
   run() {
@@ -72,21 +93,44 @@ function queueWatcher(watcher) {
   }
 }
 
+// nextTick没有直接使用某个api  而是采用优雅降级的方式
+// 内部先采用的是Promise （ie不兼容）， 在看MutationObserver ， 
+// 还不支持可以考虑 ie专属的 setImmediate 最后 setTimeOut
 let callbacks = []
 let waiting = false
 export function nextTick(cb) { // 先执行内部还是先用户的？
   callbacks.push(cb) // 维护nextTick中的callback方法
   if (!waiting) {
-    setTimeout(() => {
-      flushCallBacks() // 最后一起刷新
-    }, 0)
+    // setTimeout(() => {
+    //   flushCallBacks() // 最后一起刷新
+    // }, 0)
+    timerFunc()
     waiting = true
   }
 }
-// nextTick没有直接使用某个api  而是采用优雅降级的方式
-// 内部先采用的是Promise （ie不兼容）， 在看MutationObserver ， 
-// 还不支持可以考虑 ie专属的 setImmediate 最后 setTimeOut
-
+let timerFunc;
+if (Promise) {
+  timerFunc = () => {
+    Promise.resolve().then(flushCallBacks)
+  }
+} else if (MutationObserver) {
+  let observer = new MutationObserver(flushCallBacks)
+  let textNode = document.createTextNode(1);
+  observer.observe(textNode, {
+    characterData: true
+  })
+  timerFunc = () => {
+    textNode.textContent = 2
+  }
+} else if (setImmediate) {
+  timerFunc = () => {
+    setImmediate(flushCallBacks)
+  }
+} else {
+  timerFunc = () => {
+    setTimeout(flushCallBacks)
+  }
+}
 function flushCallBacks() {
   let cbs = callbacks.slice(0)
   callbacks = []

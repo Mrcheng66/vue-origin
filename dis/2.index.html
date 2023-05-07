@@ -28,6 +28,11 @@
   </div>
   <script src="./vue.js"></script>
   <script>
+    Vue.mixin({
+      created() {
+        console.log('mixin-created');
+      }
+    })
     const vm = new Vue({
       el: '#app', // 我们将数据解析到el上
       data() {
@@ -37,8 +42,12 @@
           hobby: ['eat', 'drink', { a: 123 }]
         }
       },
+      created() {
+        console.log('----created');
+      }
       // template: '<div>hello</div>'
     })
+    console.log(Vue.options);
 
     // 属性和我们的视图关联起来， 做到数据变化可以自动更新视图（观察者模式）
     setTimeout(() => {
