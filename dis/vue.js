@@ -61,8 +61,8 @@
       this.deps = []; // 让watcher记住dep也是为了组件卸载和计算属性的实现
       this.depsId = new Set();
       
-      this.lazy = options.lazy;
-      this.dirty = this.lazy; // 缓存值
+      this.lazy = options.lazy; // 判断计算属性
+      this.dirty = this.lazy; // 缓存值，判断更新
       this.lazy ? undefined : this.get();
     }
     // 判断dirty重新执行
