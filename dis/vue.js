@@ -53,17 +53,24 @@
   // 每个属性都有一个dep（属性就是被观察者）， watcher就是观察者（属性变化了会通知观察者来更新） -》 观察者模式
   let id = 0;
   class Watcher {
-    constructor(vm, callback, options) {
+    constructor(vm, expOrFn, options, cb) {
       this.id = id++;
       this.vm = vm;
       this.renderWatcher = options;
-      this.getter = callback; // geter 意味着调用这个函数可以触发取值操作
+      if (typeof expOrFn === 'string') {
+        this.getter = function () {
+          return vm[expOrFn]
+        };
+      } else {
+        this.getter = expOrFn; // geter 意味着调用这个函数可以触发取值操作
+      }
       this.deps = []; // 让watcher记住dep也是为了组件卸载和计算属性的实现
       this.depsId = new Set();
-      
+      this.cb = cb;
       this.lazy = options.lazy; // 判断计算属性
       this.dirty = this.lazy; // 缓存值，判断更新
-      this.lazy ? undefined : this.get();
+      this.value = this.lazy ? undefined : this.get();
+      this.user = options.user; // 表示是否是用户自己的watcher
     }
     // 判断dirty重新执行
     evaluate() {
@@ -105,8 +112,11 @@
     }
 
     run() {
-      console.log('update');
-      this.get();
+      let oldVal = this.value;
+      let newVal = this.get();
+      if (this.user) {
+        this.cb.call(this.vm, newVal, oldVal);
+      }
     }
   }
 
@@ -688,6 +698,10 @@
       // 计算属性
       initComputed(vm);
     }
+    if (opts.watch) {
+      // 监听器
+      initWatch(vm);
+    }
   }
 
   function initData(vm) {
@@ -757,6 +771,31 @@
       }
       return watcher.value // 最后返回的是watcher上的值
     }
+  }
+
+  function initWatch(vm) {
+    let watch = vm.$options.watch;
+    // 
+    for (const key in watch) {
+      if (Object.hasOwnProperty.call(watch, key)) {
+        const handler = watch[key]; // 字符串 数组 函数
+        if (Array.isArray(handler)) {
+          for (let i = 0; i < handler.length; i++) {
+            creatWatcher(vm, key, handler[i]);
+          }
+        } else {
+          creatWatcher(vm, key, handler);
+        }
+      }
+    }
+  }
+
+  function creatWatcher(vm, key, handler) {
+    // 字符串  函数
+    if (typeof handler == 'string') {
+      handler = vm[handler];
+    }
+    return vm.$watch(key, handler)
   }
 
   const strats = {};
@@ -875,6 +914,13 @@
   initLifeCycle(Vue);
 
   initGlobalAPI(Vue);
+
+  // watch最终调用的都是这个方法
+  Vue.prototype.$watch = function (expOrFn, cb, option = {}) {
+    console.log(expOrFn, cb);
+
+    new Watcher(this, expOrFn, {user: true}, cb);
+  };
 
   return Vue;
 
