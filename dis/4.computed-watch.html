@@ -8,7 +8,7 @@
 </head>
 <body>
   <div id="app">
-    {{ fullName }} {{ fullName }} {{ fullName }} {{ fullName }} {{ fullName }}
+    {{ fullName }} {{ fullName }}
   </div>
   <!-- <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script> -->
   <script src="./vue.js"></script>
@@ -35,7 +35,25 @@
             console.log(val);
           }
         }
+      },
+      methods: {
+        fn (newVal, oldVal) {
+          console.log(newVal, oldVal);
+        }
+      },
+      // 直接写一个函数
+      // 可以接受数组写法
+      // 字符串写法
+      watch: {
+        firstName(newVal, oldVal) {
+          console.log(newVal, oldVal);
+        }
       }
+    })
+
+    // vm底层就算你写的是上面watch使用字符串或者是数组，也会转换成$watch的写法, $watch中可以写监听的属性字符串和函数表达式
+    vm.$watch(()=> vm.firstName,(newVal, oldVal) => {
+      console.log(newVal, oldVal, 1111);
     })
     setTimeout(() => {
       vm.firstName = '科比'

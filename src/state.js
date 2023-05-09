@@ -12,6 +12,10 @@ export function initState(vm) {
     // 计算属性
     initComputed(vm);
   }
+  if (opts.watch) {
+    // 监听器
+    initWatch(vm)
+  }
 }
 
 function initData(vm) {
@@ -81,4 +85,29 @@ function creatComputedGetter(key) {
     }
     return watcher.value // 最后返回的是watcher上的值
   }
+}
+
+function initWatch(vm) {
+  let watch = vm.$options.watch;
+  // 
+  for (const key in watch) {
+    if (Object.hasOwnProperty.call(watch, key)) {
+      const handler = watch[key]; // 字符串 数组 函数
+      if (Array.isArray(handler)) {
+        for (let i = 0; i < handler.length; i++) {
+          creatWatcher(vm, key, handler[i])
+        }
+      } else {
+        creatWatcher(vm, key, handler)
+      }
+    }
+  }
+}
+
+function creatWatcher(vm, key, handler) {
+  // 字符串  函数
+  if (typeof handler == 'string') {
+    handler = vm[handler]
+  }
+  return vm.$watch(key, handler)
 }
