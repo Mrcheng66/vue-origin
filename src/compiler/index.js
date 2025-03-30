@@ -76,8 +76,3 @@ export function compileToFunction(template) {
 
     return render;
 }
-
-
-// <xxx
-// <namepsace:xxx
-// color   =   "asdsada"     c= 'asdasd'  d=  asdasdsa
