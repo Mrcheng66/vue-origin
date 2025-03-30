@@ -1,5 +1,5 @@
 import { observe } from "./observe/index";
-import Watcher from "./observe/watcher";
+import Watcher, { nextTick } from "./observe/watcher";
 import Dep from "./observe/dep";
 export function initState(vm) {
   // 获取所有选项
@@ -110,4 +110,14 @@ function creatWatcher(vm, key, handler) {
     handler = vm[handler]
   }
   return vm.$watch(key, handler)
+}
+export function initStateMixin(Vue) {
+  // watch最终调用的都是这个方法
+  Vue.prototype.$watch = function (expOrFn, cb, option = {}) {
+    console.log(expOrFn, cb);
+
+    new Watcher(this, expOrFn, {user: true}, cb)
+  }
+
+  Vue.prototype.$nextTick = nextTick
 }

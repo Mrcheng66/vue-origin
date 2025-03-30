@@ -797,6 +797,16 @@
     }
     return vm.$watch(key, handler)
   }
+  function initStateMixin(Vue) {
+    // watch最终调用的都是这个方法
+    Vue.prototype.$watch = function (expOrFn, cb, option = {}) {
+      console.log(expOrFn, cb);
+
+      new Watcher(this, expOrFn, {user: true}, cb);
+    };
+
+    Vue.prototype.$nextTick = nextTick;
+  }
 
   const strats = {};
     const LIFE_CYCLE = ["beforeCreate", "created"];
@@ -909,18 +919,10 @@
   function Vue(option) {
     this._init(option);
   }
-  Vue.prototype.$nextTick = nextTick;
   initMixin(Vue);
   initLifeCycle(Vue);
-
   initGlobalAPI(Vue);
-
-  // watch最终调用的都是这个方法
-  Vue.prototype.$watch = function (expOrFn, cb, option = {}) {
-    console.log(expOrFn, cb);
-
-    new Watcher(this, expOrFn, {user: true}, cb);
-  };
+  initStateMixin(Vue);
 
   return Vue;
 
