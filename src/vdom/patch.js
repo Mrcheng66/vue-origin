@@ -40,7 +40,7 @@ export function patchProps(el, oldProps = {}, props = {}) {
 }
 export function patch(oldVNode, vnode) {
   // 写的是初渲染流程 
-  const isRealElement = oldVNode.nodeType;
+  const isRealElement = oldVNode.nodeType; // 这个属性是真实dom上才有的
   if (isRealElement) {
       const elm = oldVNode; // 获取真实元素
       const parentElm = elm.parentNode; // 拿到父元素

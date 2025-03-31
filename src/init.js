@@ -15,7 +15,7 @@ export function initMixin(Vue) {
     // 初始化状态
     initState(vm)
     callHook(vm, 'created')
-    // console.log(vm.$options);
+    console.log(vm.$options);
     // 实现数据挂载
     if (options.el) {
       vm.$mount(options.el)
